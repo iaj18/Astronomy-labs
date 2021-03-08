@@ -1,0 +1,120 @@
+from astropy.io import fits
+import numpy as np
+import matplotlib.pyplot as plt
+#import sep
+#import numpy.ma as ma
+from scipy.optimize import curve_fit
+#from collections import Counter
+#import math
+
+#hdulist = fits.open("A1_mosaic.fits")
+#
+#hdulist[0].header
+#pixel = hdulist[0].data
+
+#plt.hist(pixel.ravel(), bins = 1000)
+#plt.show()
+'''
+#Find mean
+noise = pixel.ravel()[(pixel.ravel() >= 3200) & (pixel.ravel() <= 3600)]
+bleeding = pixel.ravel()[(pixel.ravel() >= 37744) & (pixel.ravel() <= 38430)]
+
+
+def gaussian(x, mean, amp, sigma):
+    return amp * np.exp( - ((x - mean) / sigma) ** 2)
+
+BinH, BinBorder, _ = plt.hist(noise, bins=1000)
+BinCentre = BinBorder[:-1] + np.diff(BinBorder) / 2
+
+popt, cov = curve_fit(gaussian, BinCentre, BinH, p0=[3300, 34e4, 1.])
+(mean, amp, sigma) = popt
+print(popt)
+
+xfit = np.linspace(BinBorder[0], BinBorder[-1], 10000)
+plt.plot(xfit, gaussian(xfit, *popt), label='fit')
+plt.legend()
+
+np.std(noise)
+np.mean(noise)
+'''
+#Save as log file
+#scale = np.log(pixel)
+#plt.imshow(scale)
+#outfile = 'Log'
+#hdu = fits.PrimaryHDU(scale)
+#hdu.writeto(outfile)
+
+
+hdulist = fits.open("A1_mosaic.fits")
+hdr = hdulist[0].header
+raw = hdulist[0].data
+#
+#hdulist = fits.open("maskedfile.fits")
+#hdulist[0].header
+#masked = hdulist[0].data
+#mask = raw * masked
+#pixel = mask[400:1000, 400:1000]
+
+#plt.hist(mask.ravel(), bins = 1000)
+#hdulist = fits.open("pythonsmallfile6.fits")
+#hdr = hdulist[0].header
+#pixel = hdulist[0].data
+
+hdulist = fits.open("FinalFile8.fits")
+hdr2 = hdulist[0].header
+mask = hdulist[0].data
+pixel = mask[400:1400, 400:1400]
+
+mean = 3418.684951061761
+total = []
+R=7
+while np.amax(pixel)> 3.54e3:
+    for x in range(0,len(pixel)):
+        for y in range(0,len(pixel[0])):            
+            if pixel[x][y] == np.amax(pixel):
+                b=0
+                for x1 in range(x-R, x+R):
+                    for y1 in range(y-R, y+R):
+                        if (x1-x)**2 + (y1 - y)**2 < R**2:
+                            if x1>=0 and x1<len(pixel) and y1>=0 and y1<len(pixel[0]):
+                                if pixel[x1][y1]> mean: 
+                                    b += (pixel[x1][y1] - mean)
+                                    pixel[x1][y1] = mean                                
+                total = total + [b]
+#                list1 = x
+#                list2 = y
+#                dat = np.array([list1, list2])
+#                dat = dat.T
+#                np.savetxt('locationdata.txt', dat, delimiter = ',')
+#plt.imshow(pixel)
+
+mag =[] 
+for i in range(0, len(total)):
+    M = hdr['MAGZPT'] - 2.5*np.log(total[i])
+    mag = mag + [M]
+
+Nm = []   
+for i in range(0, len(mag)):
+    N = [n for n in mag if n <= mag[i]]
+    Nm = Nm +[len(N)]
+
+N_m = [n*3283 for n in Nm]    
+#plt.semilogy(mag, N_m, '.')
+
+#loger = np.log(errn)
+yerr = [0.434/(np.sqrt(n)) for n in Nm]
+
+lognm = np.log(N_m)
+magnitude = list(np.asarray(mag))
+m = np.arange(-2, int(max(mag)) +1)
+#plt.plot(magnitude, lognm, '.')
+plt.errorbar(magnitude, lognm, yerr, fmt='.')
+             
+def flux_limit(m, grad, c):
+    return grad*m + c
+(grad, c), fcov = curve_fit(flux_limit, magnitude, lognm)
+
+plt.plot(m, flux_limit(m, *(grad, c)), label='fit')
+plt.xlabel("$m$")
+plt.ylabel("$log(N(m))$") 
+plt.legend()
